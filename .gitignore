@@ -1,0 +1,7 @@
+.DS_Store
+**/.DS_Store
+.impeccable/
+
+# Keep approved company presentations and private narration on this computer.
+skills/slides-with-script/tool/demo/
+/ready-example/

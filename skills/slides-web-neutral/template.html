@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Neutral presentation</title>
+  <style>
+    :root { font-family: system-ui, sans-serif; color: #172033; background: #edf1f5; color-scheme: light; }
+    * { box-sizing: border-box; }
+    body { margin: 0; }
+    [hidden] { display: none !important; }
+    .slide { height: 100dvh; overflow: auto; padding: clamp(2rem, 6vw, 6rem); padding-bottom: 7rem; background: #fff; }
+    .slide.active { display: flex; flex-direction: column; justify-content: safe center; }
+    h1 { font-size: clamp(2rem, 5vw, 4.5rem); line-height: 1.1; max-width: 20ch; margin: 0 0 1.5rem; }
+    h2 { font-size: clamp(1.75rem, 4vw, 3.5rem); line-height: 1.15; margin: 0 0 1.5rem; }
+    p, li { font-size: clamp(1.1rem, 2.3vw, 2rem); line-height: 1.5; max-width: 60ch; }
+    p { margin: 0 0 1rem; }
+    li { margin-bottom: .75rem; }
+    .cover { background: #172033; color: #fff; }
+    nav { position: fixed; bottom: 1rem; left: 50%; transform: translateX(-50%); display: flex; gap: .5rem; align-items: center; padding: .5rem; border: 1px solid #aeb8c7; border-radius: .75rem; background: #fff; color: #172033; max-width: calc(100vw - 1rem); }
+    #dots { display: flex; gap: .25rem; overflow-x: auto; }
+    button { font: inherit; padding: .5rem .75rem; border: 1px solid #aeb8c7; border-radius: .4rem; background: #fff; color: #172033; cursor: pointer; }
+    button[aria-current="step"] { background: #172033; color: #fff; }
+    button:disabled { opacity: .5; cursor: not-allowed; }
+    button:focus-visible { outline: 3px solid #2563eb; outline-offset: 3px; }
+    #position { min-width: 3rem; text-align: center; }
+    @media (max-width: 600px) { nav { gap: .25rem; } button { padding: .5rem; } }
+    @media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }
+  </style>
+</head>
+<body>
+  <main>
+    <section class="slide active cover" aria-label="Slide 1">
+      <h1>A clear presentation</h1>
+      <p>One purpose. A short sequence. A useful conclusion.</p>
+    </section>
+    <section class="slide" aria-label="Slide 2" hidden>
+      <h2>Explain the main idea</h2>
+      <ul>
+        <li>State the problem.</li>
+        <li>Show the evidence.</li>
+        <li>Explain the proposed action.</li>
+      </ul>
+    </section>
+    <section class="slide" aria-label="Slide 3" hidden>
+      <h2>Choose the next action</h2>
+      <p>Identify the owner, the action, and the expected result.</p>
+    </section>
+  </main>
+  <nav aria-label="Slide navigation">
+    <button id="previous" type="button" aria-label="Previous slide">Previous</button>
+    <span id="dots"></span>
+    <span id="position" aria-live="polite"></span>
+    <button id="next" type="button" aria-label="Next slide">Next</button>
+  </nav>
+  <script>
+    (() => {
+      'use strict';
+      const slides = [...document.querySelectorAll('.slide')];
+      const previous = document.getElementById('previous');
+      const next = document.getElementById('next');
+      const dots = document.getElementById('dots');
+      let index = 0;
+      let lastGesture = -Infinity;
+      let touchStart = null;
+      const buttons = slides.map((slide, number) => {
+        slide.setAttribute('aria-label', `Slide ${number + 1}`);
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.textContent = String(number + 1);
+        button.setAttribute('aria-label', `Go to slide ${number + 1}`);
+        button.addEventListener('click', () => show(number));
+        dots.append(button);
+        return button;
+      });
+      function show(number) {
+        index = Math.max(0, Math.min(slides.length - 1, number));
+        slides.forEach((slide, candidate) => {
+          slide.hidden = candidate !== index;
+          slide.classList.toggle('active', candidate === index);
+          if (candidate === index) {
+            slide.scrollTop = 0;
+            buttons[candidate].setAttribute('aria-current', 'step');
+          } else {
+            buttons[candidate].removeAttribute('aria-current');
+          }
+        });
+        previous.disabled = index === 0;
+        next.disabled = index === slides.length - 1;
+        document.getElementById('position').textContent = `${index + 1}/${slides.length}`;
+      }
+      previous.addEventListener('click', () => show(index - 1));
+      next.addEventListener('click', () => show(index + 1));
+      document.addEventListener('keydown', event => {
+        if (event.altKey || event.ctrlKey || event.metaKey ||
+            event.target.closest?.('input, textarea, select, [contenteditable="true"]')) return;
+        const destinations = { ArrowLeft: index - 1, ArrowRight: index + 1, Home: 0, End: slides.length - 1 };
+        if (!Object.hasOwn(destinations, event.key)) return;
+        event.preventDefault();
+        show(destinations[event.key]);
+      });
+      function gesture(direction) {
+        if (performance.now() - lastGesture < 350) return;
+        lastGesture = performance.now();
+        show(index + direction);
+      }
+      document.addEventListener('wheel', event => {
+        if (event.ctrlKey || Math.abs(event.deltaY) < 20) return;
+        const slide = slides[index];
+        const direction = Math.sign(event.deltaY);
+        if (direction > 0 && slide.scrollTop + slide.clientHeight < slide.scrollHeight - 1) return;
+        if (direction < 0 && slide.scrollTop > 0) return;
+        event.preventDefault();
+        gesture(direction);
+      }, { passive: false });
+      document.addEventListener('touchstart', event => {
+        touchStart = event.touches.length === 1 ? event.touches[0].clientX : null;
+      }, { passive: true });
+      document.addEventListener('touchend', event => {
+        if (touchStart === null || event.changedTouches.length !== 1) return;
+        const distance = touchStart - event.changedTouches[0].clientX;
+        touchStart = null;
+        if (Math.abs(distance) > 60) gesture(Math.sign(distance));
+      }, { passive: true });
+      document.addEventListener('touchcancel', () => { touchStart = null; });
+      show(0);
+    })();
+  </script>
+</body>
+</html>
